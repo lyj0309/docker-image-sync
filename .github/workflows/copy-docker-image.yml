@@ -1,0 +1,60 @@
+name: Copy Docker Image
+run-name: Copy ${{ inputs.source_repo }} to ${{ inputs.destination_repo }}
+
+on: 
+  workflow_dispatch:
+    inputs:
+      source:
+        description: '镜像源 (Registry)'     
+        required: true
+        default: 'docker.io'
+      destination:
+        description: '目标源 (Registry)'
+        required: true
+        default: 'registry.cn-beijing.aliyuncs.com'
+      source_repo:
+        description: '仓库及标签 (格式 repo:tag)'
+        required: true
+        default: 'library/nginx:latest'
+      destination_repo:
+        description: '目标仓库及标签 (格式 repo:tag)'
+        required: true
+        default: 'myrepo/nginx:latest'
+      digest:
+        description: 'Docker 镜像的 digest'
+        required: true
+        default: ''
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: 安装 Skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install requests
+
+      - name: 运行 Skopeo 复制并更新进度到 Cloudflare KV
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          SOURCE_REGISTRY: ${{ github.event.inputs.source }}
+          DESTINATION_REGISTRY: ${{ github.event.inputs.destination }}
+          SOURCE_REPO: ${{ github.event.inputs.source_repo }}
+          DESTINATION_REPO: ${{ github.event.inputs.destination_repo }}
+          DIGEST: ${{ github.event.inputs.digest }}
+        run: |
+          python3 skopeo_copy_with_progress.py
